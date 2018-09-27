@@ -54,6 +54,25 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     }
 };
 
+class LedTestCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+        std::string rxValue = pCharacteristic->getValue();
+
+        if (rxValue.length() > 0) {
+            bool orig_led_state = digitalRead(LED_BUILTIN);
+            Serial.println("Received led TEST command");
+            for (int i = 0; i < 3; i++) {
+                //flash led 3 times
+                digitalWrite(LED_BUILTIN, !orig_led_state);
+                delay(100);
+                digitalWrite(LED_BUILTIN, orig_led_state);
+                delay(100);
+            }
+            
+
+        }
+    }
+}
 
 bool state = LOW;
 #define BUTTON_PIN 0
@@ -96,6 +115,12 @@ void setup() {
         BLECharacteristic::PROPERTY_WRITE
     );
     pRxCharacteristic->setCallbacks(new MyCallbacks());
+
+    BLECharacteristic *pLEDCharacteristic = pService->createCharacteristic(
+        CHARACTERISTIC_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    pLEDCharacteristic->setCallbacks(new LedTestCallbacks());
 
     pService->start();
 

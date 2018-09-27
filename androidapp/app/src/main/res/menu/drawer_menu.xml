@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:showIn="navigation_view">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_card_entries"
+            android:icon="@drawable/ic_card_entries"
+            android:title="Card Entries" />
+        <item
+            android:id="@+id/nav_device_connection"
+            android:icon="@drawable/ic_device_connection"
+            android:title="Device Connection" />
+        <item
+            android:id="@+id/nav_tools"
+            android:icon="@drawable/ic_tools"
+            android:title="Tools" />
+    </group>
+
+    <item android:title="Actions">
+        <menu>
+            <item
+                android:id="@+id/nav_led_test"
+                android:icon="@drawable/ic_led_test"
+                android:title="LED Test" />
+        </menu>
+    </item>
+
+</menu>
