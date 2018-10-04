@@ -28,13 +28,14 @@ const uint16_t BATTERY_TX_CHARACTERISTIC_UUID = 0x2A19;
 // Minimum 5 IPS, maximum 50 IPS
 #define SWIPE_SPEED 10
 #define PREFERENCES_APP_NAME "magspoofbt"
+#define JSON_BUFFER_SIZE 400
 
 //Pin Numbers
 #define BT_NOTIFY_LED LED_BUILTIN
 #define COIL_ENABLE_PIN 25
 #define COIL_A 26
 #define COIL_B 27
-#define BUTTON_PIN 14
+#define BUTTON_PIN 0
 
 //LED Blinks and their meanings
 #define BLINK_BT_CONNECT 2  // blink 2 times on device connected
@@ -49,7 +50,7 @@ typedef struct
 String cardToJson(card *c)
 {
     String output;
-    StaticJsonBuffer<400> jsonBuffer;
+    StaticJsonBuffer<JSON_BUFFER_SIZE> jsonBuffer;
     JsonObject &root = jsonBuffer.createObject();
     root["track1"] = c->tracks[0];
     root["track2"] = c->tracks[1];
@@ -60,7 +61,7 @@ String cardToJson(card *c)
 
 card *jsonToCard(String json)
 {
-    StaticJsonBuffer<400> jsonBuffer;
+    StaticJsonBuffer<JSON_BUFFER_SIZE> jsonBuffer;
     JsonObject &root = jsonBuffer.parseObject(json);
 
     String track1 = root["track1"];
@@ -88,8 +89,6 @@ const card test_card = {
      ";4444444444444444=29111010000093100000?",
      0},
 };
-// Set a card's maximum size to 1kb
-#define CARD_MAX_SIZE 1024
 
 class MagSpoofUtil
 {
@@ -105,20 +104,27 @@ class MagSpoofUtil
                                  // initialized in calc_track_periods()
 
     bool f2f_pole; // used to track signal state during playback (F2F encoding)
+    int swipe_speed;
     card *mcard;
 
   public:
-    MagSpoofUtil(card *c)
+    MagSpoofUtil(card *c, int _swipe_speed)
     {
-        calc_track_periods();
         mcard = c;
+        if ((unsigned)(_swipe_speed-5) <= (50-5))
+            swipe_speed = _swipe_speed;
+        else{
+            Serial.println("Swipe speed not within tolerances");
+            swipe_speed = SWIPE_SPEED;
+        }
+        calc_track_periods();
     }
 
   private:
     void calc_track_periods()
     {
         for (int i = 0; i < 3; i++)
-            track_period_us[i] = (uint32_t)(1e6 / (SWIPE_SPEED * track_density[i]));
+            track_period_us[i] = (uint32_t)(1e6 / (swipe_speed * track_density[i]));
     }
 
     void invert_coil_pole()
@@ -268,8 +274,6 @@ struct CardNotExistsException : public std::exception
 class MagSpoofCallbacks : public BLECharacteristicCallbacks
 {
   private:
-    static card *selectedCard;
-    const char *commands[3] = {"save", "delete", "setactive"};
 
     std::vector<String> splitStringToVector(String msg)
     {
@@ -353,16 +357,11 @@ class MagSpoofCallbacks : public BLECharacteristicCallbacks
         // Expected input for each command:
         // Json formatted string with these parameters:
         // name: Standard string
-        // command: one of ["savecard", "delcard", "setactive"]
+        // command: one of ["savecard", "delcard", "setactive", "clearall"]
         // track1-3: String containting the data of each track
         String rxValue = pChar->getValue().c_str();
-        Serial.println(rxValue);
         StaticJsonBuffer<400> jsonBuffer;
-        Serial.print("...1");
         JsonObject &root = jsonBuffer.parseObject(rxValue);
-        Serial.print("...2");
-        Serial.println((const char *)root["command"]);
-        Serial.print("...3");
         String command = root["command"];
         try
         {
@@ -391,6 +390,21 @@ class MagSpoofCallbacks : public BLECharacteristicCallbacks
             else if (command == "setactive")
             {
                 setactive(root["name"]);
+            }
+            else if (command == "clearall")
+            {
+                Preferences prefs;
+                prefs.begin(PREFERENCES_APP_NAME, false);
+                prefs.clear();
+                prefs.end();
+                pChar->setValue("Cleared all cards");
+            }
+            else if (command == "swipespeed")
+            {
+                Preferences prefs;
+                prefs.begin(PREFERENCES_APP_NAME, false);
+                prefs.putUInt("swipespeed", root["swipespeed"]);
+                prefs.end();
             }
             else
             {
@@ -437,33 +451,6 @@ class LedTestCallbacks : public BLECharacteristicCallbacks
     }
 };
 
-// class BatteryCallbacks : public BLECharacteristicCallbacks
-// {
-//     int querypin = 36;
-//     void onWrite(BLECharacteristic *pChar)
-//     {
-//         String rxValue = pChar->getValue().c_str();
-//         querypin = rxValue.toInt();
-//         Serial.print("Setting query pin to ");
-//         Serial.println(querypin);
-//     }
-//     void onRead(BLECharacteristic *pChar)
-//     {
-//         Serial.println("battery level was read");
-//         Serial.println(adc1_get_voltage(ADC1_CHANNEL_0));
-//         int output;
-//         float VBAT = (127.0f / 100.0f) * 3.30f * float(analogRead(querypin)) / 4096.0f; // LiPo battery
-//         output = map(VBAT, 0, 4.2, 0, 100);
-//         Serial.print("analog read of pin ");
-//         Serial.print(querypin);
-//         Serial.print(": ");
-//         Serial.println(VBAT, 2);
-//         Serial.print("percentage: ");
-//         Serial.print(output);
-//         Serial.println("%");
-//         pChar->setValue(output);
-//     }
-// };
 
 bool state = LOW;
 void toggleBLEAdvertising()
@@ -493,18 +480,16 @@ void play_active_card()
     Serial.println("Playing active card...");
     Preferences prefs;
     prefs.begin(PREFERENCES_APP_NAME, true);
-
     String activecard = prefs.getString("activecard");
     Serial.println(activecard);
     card *c = new card(test_card);
     c = jsonToCard(prefs.getString(activecard.c_str()));
-    Serial.println(c->tracks[0]);
-    Serial.println(c->tracks[1]);
-    MagSpoofUtil msu(c);
+    int swipespeed = prefs.getUInt("swipespeed", SWIPE_SPEED);
+    Serial.print("With swipe speed of "); Serial.println(swipespeed);
+    MagSpoofUtil msu(c, swipespeed);
     msu.play_card();
+    delete c;
     Serial.println("Done.");
-    // card *c = new card(test_card);
-    // cardToJson(c);
 }
 
 void setup()
@@ -521,13 +506,6 @@ void setup()
 
     delay(500);
 
-    // {
-    //     Preferences prefs;
-    //     prefs.begin(PREFERENCES_APP_NAME, false);
-    //     prefs.clear();
-    //     prefs.end();
-    // }
-
     //Bluetooth stuffs
     {
         BLEDevice::init("MagSpoofBT");
@@ -536,27 +514,15 @@ void setup()
 
         BLEService *pMagSpoofService = pServer->createService(MAGSPOOF_SERVICE_UUID);
 
-        // BLECharacteristic *pLEDCharacteristic = pMagSpoofService->createCharacteristic(
-        //     TEST_LED_CHARACTERISTIC_UUID,
-        //     BLECharacteristic::PROPERTY_WRITE_NR);
-        // pLEDCharacteristic->setCallbacks(new LedTestCallbacks());
+        BLECharacteristic *pLEDCharacteristic = pMagSpoofService->createCharacteristic(
+            TEST_LED_CHARACTERISTIC_UUID,
+            BLECharacteristic::PROPERTY_WRITE_NR);
+        pLEDCharacteristic->setCallbacks(new LedTestCallbacks());
 
         BLECharacteristic *pMagSpoofCharacteristic = pMagSpoofService->createCharacteristic(
             MAGSPOOF_RX_CHARACTERISTIC_UUID,
             BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ);
         pMagSpoofCharacteristic->setCallbacks(new MagSpoofCallbacks());
-
-        /*  
-        *   Battery not working until we figure out how to pull correct voltage reading
-        *   via a voltage divider attached to an ADC channel.
-        */
-        // BLECharacteristic *pBattChar = pMagSpoofService->createCharacteristic(
-        //     BATTERY_TX_CHARACTERISTIC_UUID,
-        //     BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
-        // pBattChar->addDescriptor(new BLE2902());
-        // double battlevel;
-        // pBattChar->setValue(battlevel);
-        // pBattChar->setCallbacks(new BatteryCallbacks());
 
         pMagSpoofService->start();
     }
