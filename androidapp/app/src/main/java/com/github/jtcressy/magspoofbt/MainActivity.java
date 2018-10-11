@@ -47,14 +47,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 break;
             case R.id.nav_device_connection:
                 getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                        new DeviceConnectionFragment()).commit();
+                        new DeviceSettingsFragment()).commit();
                 break;
             case R.id.nav_tools:
                 getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
                         new ToolsFragment()).commit();
-                break;
-            case R.id.nav_led_test:
-                Toast.makeText(this, "Testing LED on device", Toast.LENGTH_SHORT).show();
                 break;
         }
         drawer.closeDrawer(GravityCompat.START);

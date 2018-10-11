@@ -5,4 +5,32 @@
 
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
+
+
+    <!--Device Connection Strings-->
+    <string name="device_connection_title">Device Settings</string>
+    <string name="device_connection_desc">Manage your MagSpoof device</string>
+    <string name="device_connection_label_deviceName">Device Name</string>
+    <string name="device_connection_placeholder_deviceName">@string/app_name</string>
+    <string name="device_connection_placeholder_serialNumber">MGSPFxxxx-xxxx</string>
+    <string name="device_connection_label_connectionStatus">Connection Status</string>
+    <string name="device_connection_label_serialNumber">Serial Number</string>
+    <string name="device_connection_label_actions_scan">SCAN</string>
+    <string name="device_connection_label_actions_connect">CONNECT</string>
+    <string name="device_connection_label_actions_unpair">UNPAIR</string>
+    <string name="device_connection_status_connected">Connected</string>
+    <string name="device_connection_status_disconnected">Disconnected</string>
+    <string name="device_connection_status_scanning">Scanning</string>
+    <string name="device_connection_status_default">@string/device_connection_status_disconnected</string>
+    <string-array name="device_connection_statuses">
+        <item>@string/device_connection_status_connected</item>
+        <item>@string/device_connection_status_disconnected</item>
+        <item>@string/device_connection_status_scanning</item>
+    </string-array>
+
+    <!--Device Description Card Strings-->
+    <string name="device_desc_label_deviceName">@string/device_connection_label_deviceName</string>
+    <string name="device_desc_label_serialNumber">@string/device_connection_label_serialNumber</string>
+    <string name="device_desc_label_pair">PAIR</string>
+
 </resources>

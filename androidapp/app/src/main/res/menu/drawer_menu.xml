@@ -11,7 +11,7 @@
         <item
             android:id="@+id/nav_device_connection"
             android:icon="@drawable/ic_device_connection"
-            android:title="Device Connection" />
+            android:title="Device Settings" />
         <item
             android:id="@+id/nav_tools"
             android:icon="@drawable/ic_tools"
